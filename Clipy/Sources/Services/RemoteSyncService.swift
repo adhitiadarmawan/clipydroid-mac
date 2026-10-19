@@ -23,7 +23,9 @@ final class RemoteSyncService {
     private var cancellables: Set<AnyCancellable> = []
     private let queue = DispatchQueue(label: "com.clipy-app.Clipy.RemoteSync")
 
-    private let maxRequestSize = 2 * 1024 * 1024
+    private let maxRequestSize = 30 * 1024 * 1024
+    /// Bodies larger than this are only accepted once the pairing token checks out.
+    private let maxUnauthenticatedSize = 64 * 1024
     private let maxTextLength = 1_000_000
     private let historyLimit = 50
 
@@ -109,8 +111,8 @@ final class RemoteSyncService {
         return "http://\(address):\(port)/#t=\(token)"
     }
 
-    private func isAuthorized(_ request: HTTPRequest) -> Bool {
-        let provided = Array((request.headers["x-clipy-token"] ?? "").utf8)
+    private func isAuthorized(_ headers: [String: String]) -> Bool {
+        let provided = Array((headers["x-clipy-token"] ?? "").utf8)
         let expected = Array(token.utf8)
         guard !expected.isEmpty, provided.count == expected.count else { return false }
         return zip(provided, expected).reduce(0) { $0 | ($1.0 ^ $1.1) } == 0
@@ -122,8 +124,21 @@ private extension RemoteSyncService {
     struct HTTPRequest {
         let method: String
         let path: String
+        let query: [String: String]
         let headers: [String: String]
         let body: Data
+    }
+
+    struct RequestHead {
+        let method: String
+        let target: String
+        let headers: [String: String]
+        let bodyStart: Data.Index
+    }
+
+    /// Accumulates one request without copying the whole buffer on every chunk.
+    final class RequestBuffer {
+        var data = Data()
     }
 
     struct HTTPResponse {
@@ -143,21 +158,26 @@ private extension RemoteSyncService {
 
     func accept(_ connection: NWConnection) {
         connection.start(queue: queue)
-        queue.asyncAfter(deadline: .now() + 15) { connection.cancel() }
-        receive(on: connection, buffer: Data())
+        // Long enough for a phone to upload a photo over Wi-Fi.
+        queue.asyncAfter(deadline: .now() + 60) { connection.cancel() }
+        receive(on: connection, buffer: RequestBuffer())
     }
 
-    func receive(on connection: NWConnection, buffer: Data) {
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
+    func receive(on connection: NWConnection, buffer: RequestBuffer) {
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 1 << 20) { [weak self] data, _, isComplete, error in
             guard let self else { return }
-            var buffer = buffer
-            if let data { buffer.append(data) }
+            if let data { buffer.data.append(data) }
 
-            if buffer.count > maxRequestSize {
+            if buffer.data.count > maxRequestSize {
                 send(.error(413, "payload too large"), on: connection)
                 return
             }
-            if let request = parse(buffer) {
+            if buffer.data.count > maxUnauthenticatedSize,
+               let head = parseHead(buffer.data), !isAuthorized(head.headers) {
+                send(.error(401, "unauthorized"), on: connection)
+                return
+            }
+            if let request = parse(buffer.data) {
                 route(request) { [weak self] response in
                     self?.send(response, on: connection)
                 }
@@ -169,8 +189,8 @@ private extension RemoteSyncService {
         }
     }
 
-    /// Returns nil until the whole request (headers + Content-Length body) has arrived.
-    func parse(_ buffer: Data) -> HTTPRequest? {
+    /// Returns nil until the request line and all headers have arrived.
+    func parseHead(_ buffer: Data) -> RequestHead? {
         guard let separator = buffer.range(of: Data("\r\n\r\n".utf8)) else { return nil }
         let headerText = String(decoding: buffer[buffer.startIndex..<separator.lowerBound], as: UTF8.self)
         var lines = headerText.components(separatedBy: "\r\n")
@@ -184,15 +204,28 @@ private extension RemoteSyncService {
             let value = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
             headers[name] = value
         }
+        return RequestHead(
+            method: String(requestLine[0]),
+            target: String(requestLine[1]),
+            headers: headers,
+            bodyStart: separator.upperBound
+        )
+    }
 
-        let contentLength = Int(headers["content-length"] ?? "0") ?? 0
-        let body = buffer[separator.upperBound...]
+    /// Returns nil until the whole request (headers + Content-Length body) has arrived.
+    func parse(_ buffer: Data) -> HTTPRequest? {
+        guard let head = parseHead(buffer) else { return nil }
+        let contentLength = Int(head.headers["content-length"] ?? "0") ?? 0
+        let body = buffer[head.bodyStart...]
         guard body.count >= contentLength else { return nil }
 
+        let components = URLComponents(string: head.target)
+        let query = (components?.queryItems ?? []).reduce(into: [String: String]()) { $0[$1.name] = $1.value }
         return HTTPRequest(
-            method: String(requestLine[0]),
-            path: String(requestLine[1].split(separator: "?").first ?? "/"),
-            headers: headers,
+            method: head.method,
+            path: components?.path ?? "/",
+            query: query,
+            headers: head.headers,
             body: Data(body.prefix(contentLength))
         )
     }
@@ -219,7 +252,7 @@ private extension RemoteSyncService {
         case ("GET", "/favicon.ico"):
             respond(HTTPResponse(status: 204, contentType: "text/plain", body: Data()))
         case (_, let path) where path.hasPrefix("/api/"):
-            guard isAuthorized(request) else {
+            guard isAuthorized(request.headers) else {
                 respond(.error(401, "unauthorized"))
                 return
             }
@@ -237,18 +270,28 @@ private extension RemoteSyncService {
         case ("GET", "/api/history"):
             let items: [[String: Any]] = pasteboardHistoryRepository
                 .fetchHistoryDetails(sortsByCreatedAt: false, includesThumbnailAsset: false, limit: historyLimit)
-                .compactMap { detail in
-                    guard
-                        let text = pasteboardHistoryRepository.fetchContent(id: detail.history.id)?.stringValue,
-                        !text.isEmpty
-                    else { return nil }
-                    return [
-                        "id": detail.history.id.rawValue,
-                        "text": String(text.prefix(maxTextLength)),
-                        "updatedAt": detail.history.updateAt
-                    ]
-                }
+                .compactMap { historyItem(for: $0.history) }
             return .json(["device": Host.current().localizedName ?? "Mac", "items": items])
+
+        case ("GET", "/api/image"):
+            guard
+                let id = request.query["id"],
+                let data = pasteboardHistoryRepository.fetchContent(id: PasteboardHistory.ID(rawValue: id))?.imageData,
+                let image = Self.transferableImage(data)
+            else { return .error(404, "no image") }
+            return HTTPResponse(status: 200, contentType: image.contentType, body: image.data)
+
+        case ("POST", "/api/send-image"):
+            guard let representation = Self.bitmap(from: request.body),
+                  let png = representation.representation(using: .png, properties: [:])
+            else { return .error(400, "invalid image") }
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            pasteboard.setData(png, forType: .png)
+            if let tiff = representation.tiffRepresentation {
+                pasteboard.setData(tiff, forType: .tiff)
+            }
+            return .json(["ok": true])
 
         case ("POST", "/api/copy"):
             guard
@@ -274,6 +317,46 @@ private extension RemoteSyncService {
     }
 }
 
+// MARK: - Images
+private extension RemoteSyncService {
+    static let imageTypes: Set<NSPasteboard.PasteboardType> = [.png, .tiff, .deprecatedTIFF]
+
+    /// Classifies a history entry from its stored types so polling never loads image blobs needlessly.
+    func historyItem(for history: PasteboardHistory) -> [String: Any]? {
+        var item: [String: Any] = ["id": history.id.rawValue, "updatedAt": history.updateAt]
+        let types = history.pasteboardTypes
+        let hasImage = types.contains { Self.imageTypes.contains($0) }
+        let primaryIsImage = types.first.map { Self.imageTypes.contains($0) } ?? false
+
+        if !primaryIsImage,
+           types.contains(.string) || types.contains(.deprecatedString),
+           let text = pasteboardHistoryRepository.fetchContent(id: history.id)?.stringValue,
+           !text.isEmpty {
+            item["kind"] = "text"
+            item["text"] = String(text.prefix(maxTextLength))
+        } else if hasImage {
+            item["kind"] = "image"
+        } else {
+            return nil
+        }
+        return item
+    }
+
+    /// PNG and JPEG go out as-is; anything else (TIFF, HEIC, …) is converted to PNG for the phone.
+    static func transferableImage(_ data: Data) -> (data: Data, contentType: String)? {
+        if data.starts(with: [0x89, 0x50, 0x4E, 0x47]) { return (data, "image/png") }
+        if data.starts(with: [0xFF, 0xD8, 0xFF]) { return (data, "image/jpeg") }
+        guard let png = bitmap(from: data)?.representation(using: .png, properties: [:]) else { return nil }
+        return (png, "image/png")
+    }
+
+    static func bitmap(from data: Data) -> NSBitmapImageRep? {
+        guard !data.isEmpty else { return nil }
+        if let representation = NSBitmapImageRep(data: data) { return representation }
+        return NSImage(data: data)?.tiffRepresentation.flatMap(NSBitmapImageRep.init(data:))
+    }
+}
+
 // MARK: - Web UI
 private extension RemoteSyncService {
     static let page = #"""
@@ -292,11 +375,13 @@ private extension RemoteSyncService {
     button{border:0;border-radius:10px;background:var(--acc);color:#fff;font:inherit;font-weight:600;padding:10px 16px}
     .row{display:flex;gap:8px;margin:8px 0 20px}.row button.alt{background:var(--card);color:var(--fg);border:1px solid var(--line)}
     .item{background:var(--card);border-radius:12px;padding:12px;margin-bottom:8px;white-space:pre-wrap;word-break:break-word;max-height:7.5em;overflow:hidden}
-    .item:active{opacity:.6}#msg{position:fixed;left:0;right:0;bottom:16px;text-align:center;color:var(--mute);font-size:14px}
+    .item:active{opacity:.6}.item.pic{max-height:none;padding:8px}.item.pic img{display:block;max-width:100%;max-height:260px;border-radius:8px;margin:0 auto}
+    .hint{color:var(--mute);font-size:12px;text-align:center;margin-top:4px}#msg{position:fixed;left:0;right:0;bottom:16px;text-align:center;color:var(--mute);font-size:14px}
     </style></head><body><main>
     <h1>ClipyDroid</h1><div class="sub" id="dev">Connecting…</div>
     <textarea id="t" placeholder="Type or paste text to send to your Mac"></textarea>
-    <div class="row"><button id="send">Send to Mac</button><button class="alt" id="paste">Paste</button></div>
+    <div class="row"><button id="send">Send to Mac</button><button class="alt" id="paste">Paste</button><button class="alt" id="pick">Send image</button>
+    <input type="file" id="file" accept="image/*" hidden></div>
     <div id="list"></div><div id="msg"></div>
     <script>
     const $=id=>document.getElementById(id);
@@ -315,6 +400,12 @@ private extension RemoteSyncService {
       document.body.appendChild(a);a.select();document.execCommand('copy');a.remove();return Promise.resolve();
     }
     let last='';
+    const images=new Map();
+    function imageURL(id){
+      if(!images.has(id))images.set(id,fetch('/api/image?id='+encodeURIComponent(id),{headers:{'X-Clipy-Token':token}})
+        .then(r=>{if(!r.ok)throw new Error();return r.blob()}).then(b=>URL.createObjectURL(b)));
+      return images.get(id);
+    }
     async function refresh(){
       try{
         const d=await api('/api/history');
@@ -323,8 +414,17 @@ private extension RemoteSyncService {
         if(sig===last)return;last=sig;
         const list=$('list');list.textContent='';
         for(const i of d.items){
-          const e=document.createElement('div');e.className='item';e.textContent=i.text;
-          e.onclick=()=>copyLocal(i.text).then(()=>note('Copied on this phone'));
+          const e=document.createElement('div');
+          if(i.kind==='image'){
+            e.className='item pic';
+            const img=document.createElement('img');img.alt='Image from Mac';
+            imageURL(i.id).then(u=>img.src=u).catch(()=>{e.textContent='Image unavailable'});
+            const h=document.createElement('div');h.className='hint';h.textContent='Long-press to save or copy';
+            e.append(img,h);
+          }else{
+            e.className='item';e.textContent=i.text;
+            e.onclick=()=>copyLocal(i.text).then(()=>note('Copied on this phone'));
+          }
           list.appendChild(e);
         }
       }catch(e){$('dev').textContent=e.message}
@@ -335,6 +435,15 @@ private extension RemoteSyncService {
     };
     $('paste').onclick=async()=>{
       try{$('t').value=await navigator.clipboard.readText()}catch(e){note('Long-press the box and paste')}
+    };
+    $('pick').onclick=()=>$('file').click();
+    $('file').onchange=async()=>{
+      const f=$('file').files[0];if(!f)return;note('Sending image…');
+      try{
+        const r=await fetch('/api/send-image',{method:'POST',headers:{'X-Clipy-Token':token,'Content-Type':f.type||'application/octet-stream'},body:f});
+        if(!r.ok)throw new Error('Upload failed');note('Image sent to Mac');refresh();
+      }catch(e){note(e.message)}
+      $('file').value='';
     };
     refresh();setInterval(refresh,2000);
     </script></main></body></html>
