@@ -53,6 +53,8 @@ class AppDelegate: NSObject, NSMenuItemValidation {
     private var menuManager
     @Dependency(\.sparkle)
     private var sparkle
+    @Dependency(\.remoteSyncService)
+    private var remoteSyncService
 
     @Shared(.isLaunchAtLogin)
     private var isLaunchAtLogin
@@ -170,6 +172,7 @@ extension AppDelegate: NSApplicationDelegate {
 
         // Services
         clipService.startMonitoring()
+        remoteSyncService.start()
         hotKeyService.setupDefaultHotKeys()
 
         // Managers
@@ -181,6 +184,7 @@ extension AppDelegate: NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         guard !isTesting else { return }
         clipService.applicationWillTerminate()
+        remoteSyncService.stop()
     }
 }
 

@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A1B2C3D4E5F60718293A4B04 /* RemoteSyncSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B03 /* RemoteSyncSettingsView.swift */; };
+		A1B2C3D4E5F60718293A4B02 /* RemoteSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B01 /* RemoteSyncService.swift */; };
 		3CF59853A5DC43C499D09C01 /* SettingsScrollView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82DC78C62401491B956E0499 /* SettingsScrollView.swift */; };
 		8AA4F6ACDD775CF0C29E69F3 /* MenuSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BA8B8CBCA2A18E704175716 /* MenuSettingsView.swift */; };
 		8CF74F044CD75E9CB210F85D /* SettingsNumberField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23265781AF16C4883961248E /* SettingsNumberField.swift */; };
@@ -146,6 +148,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		A1B2C3D4E5F60718293A4B03 /* RemoteSyncSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteSyncSettingsView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4B01 /* RemoteSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteSyncService.swift; sourceTree = "<group>"; };
 		06C40C3662B1685B37D32C9E /* UpdateSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateSettingsView.swift; sourceTree = "<group>"; };
 		1D69CAC28579C30FFD32BC54 /* ShortcutRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutRecorder.swift; sourceTree = "<group>"; };
 		22E5C2EB7E570E8AB6E6EF2D /* BetaSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BetaSettingsView.swift; sourceTree = "<group>"; };
@@ -347,6 +351,7 @@
 				7BA8B8CBCA2A18E704175716 /* MenuSettingsView.swift */,
 				3953EC7B9131A8084AE65BA5 /* ClipboardTypeSettingsView.swift */,
 				C85E5FFA18274CF0DFB44E1E /* ExcludedApplicationsSettingsView.swift */,
+				A1B2C3D4E5F60718293A4B03 /* RemoteSyncSettingsView.swift */,
 				BCC2D2A9B7104D06EC75B8CD /* ShortcutSettingsView.swift */,
 				06C40C3662B1685B37D32C9E /* UpdateSettingsView.swift */,
 				22E5C2EB7E570E8AB6E6EF2D /* BetaSettingsView.swift */,
@@ -600,6 +605,7 @@
 			isa = PBXGroup;
 			children = (
 				FA0D5CE71DDCC61600AC9052 /* ClipService.swift */,
+				A1B2C3D4E5F60718293A4B01 /* RemoteSyncService.swift */,
 				FAE911B81DE045E2008A4BEC /* HotKeyService.swift */,
 				FAC0DCF01DE576F300309C49 /* PasteService.swift */,
 			);
@@ -976,6 +982,7 @@
 				C5D091013095000100000001 /* DonationSettingsView.swift in Sources */,
 				FC67F161B362841689D6B78A /* ClipboardTypeSettingsView.swift in Sources */,
 				F1753D7A92A504F63D87EC71 /* ExcludedApplicationsSettingsView.swift in Sources */,
+				A1B2C3D4E5F60718293A4B04 /* RemoteSyncSettingsView.swift in Sources */,
 				C38C356A970DED048CF311FF /* GeneralSettingsView.swift in Sources */,
 				8AA4F6ACDD775CF0C29E69F3 /* MenuSettingsView.swift in Sources */,
 				8CF74F044CD75E9CB210F85D /* SettingsNumberField.swift in Sources */,
@@ -1010,6 +1017,7 @@
 				C5E8EE6A2FFA2A5600270F1F /* SnippetExtensions.swift in Sources */,
 				FA1DB4B91DDCB452007F95C8 /* NSMenuItem+Initialize.swift in Sources */,
 				FA0D5CE81DDCC61600AC9052 /* ClipService.swift in Sources */,
+				A1B2C3D4E5F60718293A4B02 /* RemoteSyncService.swift in Sources */,
 				C5CC3FD430392F7000875CFE /* DeviceIdentifier.swift in Sources */,
 				C5F1AD0130190005AA110001 /* TextRecognizer.swift in Sources */,
 				FA1DB4C91DDCB460007F95C8 /* MenuManager.swift in Sources */,
@@ -1260,7 +1268,9 @@
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				INFOPLIST_FILE = "Clipy/Supporting Files/Info.plist";
 				OTHER_LDFLAGS = "-ObjC";
-				PRODUCT_BUNDLE_IDENTIFIER = "com.clipy-app.Clipy.debug";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.clipy-app.ClipyDroid.debug";
+				PRODUCT_NAME = ClipyDroid;
+				PRODUCT_MODULE_NAME = Clipy;
 				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
 				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
 				RUNTIME_EXCEPTION_ALLOW_UNSIGNED_EXECUTABLE_MEMORY = NO;
@@ -1286,7 +1296,9 @@
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				INFOPLIST_FILE = "Clipy/Supporting Files/Info.plist";
 				OTHER_LDFLAGS = "-ObjC";
-				PRODUCT_BUNDLE_IDENTIFIER = "com.clipy-app.Clipy";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.clipy-app.ClipyDroid";
+				PRODUCT_NAME = ClipyDroid;
+				PRODUCT_MODULE_NAME = Clipy;
 				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
 				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
 				RUNTIME_EXCEPTION_ALLOW_UNSIGNED_EXECUTABLE_MEMORY = NO;
@@ -1306,7 +1318,7 @@
 					"@loader_path/../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "com.clipyapp.$(PRODUCT_NAME:rfc1034identifier)";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Clipy.app/Contents/MacOS/Clipy";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ClipyDroid.app/Contents/MacOS/ClipyDroid";
 			};
 			name = Debug;
 		};
@@ -1320,7 +1332,7 @@
 					"@loader_path/../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "com.clipyapp.$(PRODUCT_NAME:rfc1034identifier)";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Clipy.app/Contents/MacOS/Clipy";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ClipyDroid.app/Contents/MacOS/ClipyDroid";
 			};
 			name = Release;
 		};

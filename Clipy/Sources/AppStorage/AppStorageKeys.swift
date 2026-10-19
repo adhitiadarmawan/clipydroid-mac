@@ -43,6 +43,9 @@ enum AppStorageKeys: String {
     case showColorPreviewInTheMenu = "kCPYPrefShowColorPreviewInTheMenu"
     case ignoreConcealedPasteboardType = "kCPYPrefIgnoreConcealedPasteboardType"
     case ignoresUniversalClipboard
+    case remoteSyncEnabled
+    case remoteSyncPort
+    case remoteSyncToken
     case pastePlainText = "kCPYBetaPastePlainText"
     case pastePlainTextModifier = "kCPYBetaPastePlainTextModifier"
     case deleteHistory = "kCPYBetaDeleteHistory"

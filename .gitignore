@@ -155,3 +155,8 @@ build-iPhoneSimulator/
 
 # Firebase
 GoogleService-Info.plist
+
+# ClipyDroid: Android app and build artifacts live outside this repo
+android/
+dist/
+.DS_Store

@@ -99,6 +99,10 @@ extension SharedKey where Self == AppStorageKey<Bool>.Default {
         Self[.appStorage(AppStorageKeys.ignoresUniversalClipboard.rawValue), default: false]
     }
 
+    static var remoteSyncEnabled: Self {
+        Self[.appStorage(AppStorageKeys.remoteSyncEnabled.rawValue), default: false]
+    }
+
     static var pastesPlainTextWithModifier: Self {
         Self[.appStorage(AppStorageKeys.pastePlainText.rawValue), default: true]
     }
@@ -117,6 +121,10 @@ extension SharedKey where Self == AppStorageKey<Bool>.Default {
 }
 
 extension SharedKey where Self == AppStorageKey<Int>.Default {
+    static var remoteSyncPort: Self {
+        Self[.appStorage(AppStorageKeys.remoteSyncPort.rawValue), default: 8765]
+    }
+
     static var maximumHistoryCount: Self {
         Self[.appStorage(AppStorageKeys.maxHistorySize.rawValue), default: 30]
     }
@@ -237,3 +245,9 @@ extension SharedKey where Self == AppStorageKey<[ApplicationInformation]>.Defaul
 }
 
 extension KeyCombo: @retroactive @unchecked Sendable {}
+
+extension SharedKey where Self == AppStorageKey<String>.Default {
+    static var remoteSyncToken: Self {
+        Self[.appStorage(AppStorageKeys.remoteSyncToken.rawValue), default: ""]
+    }
+}

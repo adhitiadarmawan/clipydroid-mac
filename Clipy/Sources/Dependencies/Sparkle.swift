@@ -43,8 +43,9 @@ extension DependencyValues {
 
             return Sparkle(
                 configure: {
+                    // ClipyDroid fork: the upstream appcast is signed with a key this build trusts, so
+                    // starting the updater would replace ClipyDroid with stock Clipy. Keep it off.
                     updaterController.updater.clearFeedURLFromUserDefaults()
-                    updaterController.startUpdater()
                 },
                 setAutomaticallyChecksForUpdates: { isEnabled in
                     updaterController.updater.automaticallyChecksForUpdates = isEnabled

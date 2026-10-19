@@ -7,6 +7,7 @@ enum SettingsPane: String, CaseIterable {
     case clipboardType
     case excludedApplications
     case shortcuts
+    case phone
     case updates
     case beta
     case donate
@@ -23,6 +24,8 @@ enum SettingsPane: String, CaseIterable {
             String(localized: .Settings.exclude)
         case .shortcuts:
             String(localized: .Settings.shortcuts)
+        case .phone:
+            "Phone"
         case .updates:
             String(localized: .Settings.updates)
         case .beta:
@@ -44,6 +47,8 @@ enum SettingsPane: String, CaseIterable {
             "nosign"
         case .shortcuts:
             "keyboard"
+        case .phone:
+            "iphone.gen3"
         case .updates:
             "arrow.triangle.2.circlepath"
         case .beta:
@@ -80,6 +85,8 @@ enum SettingsPane: String, CaseIterable {
             ExcludedApplicationsSettingsView()
         case .shortcuts:
             ShortcutSettingsView()
+        case .phone:
+            RemoteSyncSettingsView()
         case .updates:
             UpdateSettingsView()
         case .beta:
